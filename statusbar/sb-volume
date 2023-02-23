@@ -1,0 +1,40 @@
+#!/bin/sh
+
+# Prints the current volume or 🔇 if muted.
+
+case $BLOCK_BUTTON in
+	1) wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle ;;
+	2) setsid -f "$TERMINAL" -e pavucontrol ;;
+	4) wpctl set-volume @DEFAULT_AUDIO_SINK@ 1%+ ;;
+	5) wpctl set-volume @DEFAULT_AUDIO_SINK@ 1%- ;;
+	3) notify-send "📢 Volume module" "\- Shows volume 🔊, 🔇 if muted.
+- Middle click to mute.
+- Scroll to change." ;;
+	6) "$TERMINAL" -e "$EDITOR" "$0" ;;
+esac
+
+vol="$(wpctl get-volume @DEFAULT_AUDIO_SINK@)"
+
+# If muted, print 🔇 and exit.
+[ "$vol" != "${vol%\[MUTED\]}" ] && printf "%s" "🔇" && exit
+
+vol="${vol#Volume: }"
+profile=$(pactl list cards | grep 'Active Profile: output' | sed 's/^[[:space:]]*Active Profile: //g')
+
+split() {
+	# For ommiting the . without calling and external program.
+	IFS=$2
+	set -- $1
+	printf '%s' "$@"
+}
+
+vol="$(printf "%.0f" "$(split "$vol" ".")")"
+
+case $profile in
+    "output:iec958-stereo+input:analog-stereo") icon="🔈" ;;
+#    "output:iec958-ac3-surround-51+input:analog-stereo") icon="🔈" ;;
+    "output:analog-stereo+input:analog-stereo") icon="🎧" ;;
+	  * ) printf "%s" "🔇" && exit ;;
+esac
+
+printf "%s" "$icon$vol%"

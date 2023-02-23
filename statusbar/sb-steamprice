@@ -1,0 +1,32 @@
+#!/bin/sh
+
+item_name=$1
+item_nameid=$(curl -s $2 | grep "// initial load" | tr -cd '[[:digit:]]')
+
+dir="${XDG_DATA_HOME:-$HOME/.local/share}/steam-prices"
+pricefile="$dir/$item_nameid"
+
+updateprice() { temp="$(mktemp)"
+  curl -s "https://steamcommunity.com/market/itemordershistogram?country=PL&language=english&currency=6&item_nameid=$item_nameid&two_factor=0&norender=1" | jq -r '.buy_order_table[0].price' 2>/dev/null > "$temp"
+    [ -s "$temp" ] && mv -f "$temp" "$pricefile" || touch $pricefile
+} 
+
+[ -d "$dir" ] || mkdir -p "$dir"
+
+[ -f $pricefile ] || updateprice
+
+secondsold=$(expr $(date '+%s') - $(stat -c %X "$pricefile" 2>/dev/null))
+
+[ $secondsold -gt 3600 ] && updateprice
+
+case $BLOCK_BUTTON in
+	1) setsid "$BROWSER" $2 >/dev/null 2>&1 ;;
+	3) uptime="$(date -d "$(stat -c %x "$pricefile")" '+%D at %T' | sed "s|$(date '+%D')|Today|")"
+		notify-send "$1 module" "
+- Left click to open the link to Steam market.
+- <b>Last updated:
+	$uptime</b>" ;;
+	6) "$TERMINAL" -e "$EDITOR" "$0" ;;
+esac
+
+printf "[S]$item_name %s" "$(cat "$pricefile")"
